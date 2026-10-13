@@ -44,7 +44,7 @@ Other models should show status the same way. If you try one, [let me know](../.
 ## Build
 
 ```sh
-./build.sh install    # build and copy to ~/Applications
+./build.sh install    # build and copy to /Applications
 ./build.sh dmg        # release image
 tests/run.sh          # parser tests
 ```

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# builds the .app into ./build; `install` copies it to ~/Applications, `dmg` makes a release image,
+# builds the .app into ./build; `install` copies it to /Applications, `dmg` makes a release image,
 # `debug` builds build/baski-debug with the screenshot/fake-data hooks
 set -e
 cd "${0:A:h}"
@@ -17,7 +17,7 @@ cp Info.plist "$APP/Contents/"
 mkdir -p "$APP/Contents/Resources"; cp assets/AppIcon.icns "$APP/Contents/Resources/"
 xattr -cr "$APP"; codesign -s - --force "$APP"
 if [[ "$1" == "install" ]]; then
-  rm -rf ~/Applications/"$NAME.app"; cp -R "$APP" ~/Applications/; echo "installed ~/Applications/$NAME.app"
+  rm -rf /Applications/"$NAME.app"; cp -R "$APP" /Applications/; echo "installed /Applications/$NAME.app"
 elif [[ "$1" == "dmg" ]]; then
   VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Info.plist)
   STAGE=build/dmg; rm -rf "$STAGE"; mkdir -p "$STAGE"
