@@ -33,7 +33,13 @@ baski uses two things from **Bambu Studio**: the printer's access code and its c
 
 The printer announces itself on the local network, and baski reads its status from the printer's own MQTT server. The camera stream comes through Studio's `bambu_source` helper and is decoded in hardware. That comes to about 4% CPU while the camera is open, and close to nothing otherwise. It's one Swift file with no dependencies, and nothing leaves your network.
 
-Tested on a P2S. Other models should show status the same way; their camera paths are untested.
+## Tested printers
+
+| Printer | Firmware | Status | Camera |
+|---|---|---|---|
+| P2S | 01.03 | ✅ | ✅ LAN liveview |
+
+Other models should show status the same way. If you try one, [let me know](../../issues/new) and I'll add it here.
 
 ## Build
 
