@@ -79,6 +79,7 @@ final class Discovery {
 final class MQTT {
     var onReport: (([String: Any]) -> Void)?
     var onState: ((Bool) -> Void)?
+    var onCertChanged: (() -> Void)?
     private var target: (ip: String, serial: String)?
     private var conn: NWConnection?
     private var buf = Data()
@@ -105,7 +106,10 @@ final class MQTT {
             guard let cert = (SecTrustCopyCertificateChain(t) as? [SecCertificate])?.first else { done(false); return }
             let fp = SHA256.hash(data: SecCertificateCopyData(cert) as Data).map { String(format: "%02x", $0) }.joined()
             guard let pinned = defaults.string(forKey: pinKey) else { defaults.set(fp, forKey: pinKey); done(true); return }
-            if pinned != fp { log("mqtt: printer certificate changed, refusing (Add Printer resets it)") }
+            if pinned != fp {
+                log("mqtt: printer certificate changed, refusing (Add Printer resets it)")
+                DispatchQueue.main.async { self.onCertChanged?() }
+            }
             done(pinned == fp)
         }, q)
         let c = NWConnection(host: .init(ip), port: 8883, using: NWParameters(tls: tls))
@@ -237,6 +241,7 @@ final class Model: ObservableObject {
     @Published var online = false
     @Published var report: [String: Any] = [:]
     @Published var camera: CameraState = .idle
+    @Published var certChanged = false
 
     enum CameraState: Equatable { case idle, connecting(String), live, failed(String) }
 
@@ -566,7 +571,8 @@ struct Panel: View {
                     Text(m.active || m.state == "FINISH" ? (m.job.isEmpty ? "Untitled" : m.job) : m.stateLabel)
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1).truncationMode(.middle)
-                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(m.certChanged ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 if m.active || m.state == "FINISH" {
@@ -638,6 +644,7 @@ struct Panel: View {
         var parts: [String] = []
         if m.active || m.state == "FINISH" { parts.append(m.stateLabel) }
         if m.totalLayers > 0 && m.active { parts.append("Layer \(m.layer) of \(m.totalLayers)") }
+        if m.certChanged { return "Printer certificate changed. Use ⋯ → Add Printer to trust it." }
         if parts.isEmpty, let p = m.printer { parts.append(m.online ? "Ready" : "Can't reach \(p.ip)") }
         return parts.joined(separator: " · ")
     }
@@ -689,7 +696,12 @@ final class App: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             addPrinter: { [weak self] in self?.askPrinter() }))
 
         camera.onState = { [weak self] s in self?.model.camera = s }
-        mqtt.onState = { [weak self] ok in self?.model.online = ok; self?.redraw() }
+        mqtt.onState = { [weak self] ok in
+            if ok { self?.model.certChanged = false }
+            self?.model.online = ok
+            self?.redraw()
+        }
+        mqtt.onCertChanged = { [weak self] in self?.model.certChanged = true }
         mqtt.onReport = { [weak self] j in
             guard let self else { return }
             guard let pr = j["print"] as? [String: Any] else { return }
@@ -821,6 +833,7 @@ final class App: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard !v[0].isEmpty, !v[1].isEmpty, !v[2].isEmpty else { return }
         defaults.set(v[2], forKey: "code.\(v[1])")
         defaults.removeObject(forKey: "cert.\(v[1])")  // a reset or replaced printer has a new certificate
+        model.certChanged = false
         let p = Printer(serial: v[1], ip: v[0], name: model.printers[v[1]]?.name ?? v[1], model: model.printers[v[1]]?.model ?? "")
         found(p)
         select(p.serial)
